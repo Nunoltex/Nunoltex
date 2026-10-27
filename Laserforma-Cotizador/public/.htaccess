@@ -1,0 +1,16 @@
+# Laserforma: acceso privado. cPanel completara AuthUserFile al activar Directory Privacy.
+# Sin ese paso la carpeta queda bloqueada (401/500), no publica.
+Options -Indexes
+DirectoryIndex index.html
+AuthType Basic
+AuthName "Laserforma - Acceso privado"
+Require valid-user
+
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Cache-Control "no-store"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+</IfModule>
+

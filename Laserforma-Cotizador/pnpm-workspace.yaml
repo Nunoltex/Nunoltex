@@ -1,0 +1,6 @@
+allowBuilds:
+  electron-winstaller: true
+enableGlobalVirtualStore: false
+nodeLinker: hoisted
+storeDir: .pnpm-store
+

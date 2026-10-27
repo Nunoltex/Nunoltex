@@ -1,0 +1,68 @@
+{
+  "name": "laserforma-cotizador",
+  "private": true,
+  "version": "1.3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "build:win": "pnpm build && electron-builder --win nsis portable --x64",
+    "build:win:folder": "pnpm build && electron-builder --win --x64 --dir"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.5",
+    "electron": "45.0.0",
+    "electron-builder": "26.18.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "cl.laserforma.cotizador",
+    "productName": "Laserforma Cotizador",
+    "directories": {
+      "output": "release-1.3"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Laserforma-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "Laserforma-${version}-Portable-${arch}.${ext}"
+    }
+  },
+  "description": "Cotizador de corte láser con material proporcional, reserva y modalidad solo corte"
+}
+

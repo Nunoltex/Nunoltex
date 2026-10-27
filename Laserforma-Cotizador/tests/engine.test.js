@@ -1,0 +1,21 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync,existsSync} from 'node:fs';
+import {defaults,cleanConfig,parseDXF,calcQuote,rateHour,validConfigValue} from '../src/engine.js';
+const fixture=(entities,unit=4)=>`0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n${unit}\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entities}0\nENDSEC\n0\nEOF\n`;
+const rectangle=(w,h)=>`0\nLWPOLYLINE\n70\n1\n10\n0\n20\n0\n10\n${w}\n20\n0\n10\n${w}\n20\n${h}\n10\n0\n20\n${h}\n`;
+const base=()=>({...parseDXF(fixture(rectangle(100,100)),'Cuadrado.dxf'),id:'square',qty:3,speed:2,thickness:1,material:'Acero',pricekg:1000,gas:'Aire',includeMaterial:true});
+test('Cuadrado: area, corte, perforaciones y contorno cerrado',()=>{const g=base();assert.equal(g.area,10000);assert.equal(g.length,400);assert.equal(g.pierces,1);assert.equal(g.open,0)});
+test('Pulgadas, mm, cm y metros escalan dimensiones, corte y area',()=>{for(const [u,factor] of [[1,25.4],[4,1],[5,10],[6,1000]]){const g=parseDXF(fixture(rectangle(1,1),u),'units.dxf');assert.ok(Math.abs(g.width-factor)<1e-8);assert.ok(Math.abs(g.length-factor*4)<1e-8);assert.ok(Math.abs(g.area-factor**2)<1e-6)}});
+test('Sin unidades avisa; unidad invalida rechaza',()=>{assert.match(parseDXF(fixture(rectangle(100,100),0),'unitless').unitNote,/milímetros/);assert.throws(()=>parseDXF(fixture(rectangle(1,1),999),'bad'),/Unidad/)});
+test('Un agujero se descuenta y cuenta una perforacion adicional',()=>{const g=parseDXF(fixture(rectangle(100,100)+'0\nCIRCLE\n10\n50\n20\n50\n40\n10\n'),'hole');assert.ok(Math.abs(g.area-(10000-Math.PI*100))<1);assert.equal(g.pierces,2)});
+test('VIEWPORT ignorado, SPLINE rechazada y contorno abierto detectado',()=>{assert.equal(parseDXF(fixture(rectangle(100,100)+'0\nVIEWPORT\n10\n999\n'),'viewport').area,10000);assert.throws(()=>parseDXF(fixture(rectangle(100,100)+'0\nSPLINE\n'),'spline'),/SPLINE/);assert.equal(parseDXF(fixture('0\nLINE\n10\n0\n20\n0\n11\n100\n21\n0\n'),'open').open,1)});
+test('Precio manual: velocidad m/min, preparacion y margen',()=>{const quote=calcQuote([base()],defaults),time=400/2000+.5/60,unit=(rateHour(defaults)*time/60+78.5+rateHour(defaults)*25/60/3)/.6;assert.ok(Math.abs(quote.lines[0].priceUnit-unit)<1e-8);assert.ok(Math.abs(quote.net-3*unit)<1e-8);assert.ok(Math.abs(quote.gross-quote.net*1.19)<1e-8)});
+test('Sin material solo elimina la materia prima',()=>{const it=base(),a=calcQuote([it],defaults),b=calcQuote([{...it,includeMaterial:false}],defaults);assert.ok(Math.abs(a.net-b.net-78.5*3/.6)<1e-8);assert.equal(a.setup,b.setup)});
+test('Preparacion se reparte una sola vez, incluso al cambiar cantidades',()=>{const q=calcQuote([base(),{...base(),id:'other',qty:7}],defaults);assert.equal(q.totalUnits,10);assert.ok(Math.abs(q.lines.reduce((s,l)=>s+(l.costUnit-l.v.machine-l.v.gas-l.materialCost)*l.it.qty,0)-q.setup)<1e-8)});
+test('Configuraciones invalidas recuperan defaults y conservan valores validos',()=>{for(const input of [null,[],42,{salary:-1,years:0,margin:99,electricity:700,vat:-19},{setupMin:'-25',nozzleLife:0}]){const c=cleanConfig(input);assert.ok(c.salary>=0&&c.years>0&&c.margin<=95&&c.vat>=0&&c.setupMin>=0&&c.nozzleLife>0);if(input?.electricity===700)assert.equal(c.electricity,700)}assert.ok(calcQuote([base()],{...defaults,setupMin:-25}).net>0)});
+test('Validaciones: costo negativo, infinito, vida cero y margen excesivo',()=>{assert.equal(validConfigValue('salary',-1),false);assert.equal(validConfigValue('salary',Infinity),false);assert.equal(validConfigValue('years',0),false);assert.equal(validConfigValue('margin',96),false);assert.equal(validConfigValue('salary',0),true)});
+test('Cotizacion vacia no cobra preparacion',()=>{const q=calcQuote([],defaults);assert.equal(q.setup,0);assert.equal(q.net,0);assert.equal(q.gross,0)});
+const real='C:/Users/Leona/AppData/Local/Temp/codex-file-preview-MROX7B/Bobina_motor6600V_1000HP_modelo.dxf';
+test('DXF original Bobina',{skip:!existsSync(real)},()=>{const g=parseDXF(readFileSync(real,'utf8'),'Bobina');assert.equal(g.open,0);assert.ok(Math.abs(g.area-222354.63454084165)<1e-6);assert.ok(Math.abs(g.length-8882.678137936859)<1e-6)});
+
