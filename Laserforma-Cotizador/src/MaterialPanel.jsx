@@ -64,16 +64,17 @@ function GroupResult({group}) {
     <p className="note">Vista orientativa para estimar material. El bloque a cobrar se marca en verde. Define la distribución final y los ajustes físicos de corte en CypCut.</p>
   </div>;
 }
-export default function MaterialPanel({items,settings,setSettings,plan,updateItem,removeItem}) {
+export default function MaterialPanel({context,onBack,items,settings,setSettings,plan,updateItem,removeItem}) {
   const [notice,setNotice]=useState('');
   const groups=new Map();
   for(const it of items){const key=groupKey(it);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(it)}
+  if(!items.length&&context)groups.set(groupKey(context),[{...context,contextOnly:true}]);
   function editGroup(key,patch){setSettings(old=>({...old,[key]:{...old[key],...patch}}))}
   function editStock(key,id,patch){setSettings(old=>({...old,[key]:{...old[key],stocks:old[key].stocks.map(s=>s.id===id?{...s,...patch}:s)}}))}
   function save(){try{localStorage.setItem('lf_stock_v1',JSON.stringify(settings));setNotice('Formatos, precios, separación y márgenes guardados en este computador.')}catch{setNotice('No se pudieron guardar los formatos en este computador.')}}
-  return <section className="panel material-panel"><div className="panel-heading"><div><span className="step">03</span><h2>Material y distribución</h2></div><span className="tag">Filas · giro 90°</span></div>
+  return <section className="panel material-panel"><div className="panel-heading"><div><span className="step">03</span><h2>Material y distribución</h2></div><button type="button" onClick={onBack}>← Pieza y parámetros</button></div>
     <p className="note">Cada DXF representa un modelo o conjunto que se repite completo. Los diseños se agrupan por material, espesor y suministro. Las medidas de cada formato son las que comprarás o utilizarás, incluidos los bordes. El precio completo sirve como referencia para cobrar solo el bloque utilizado.</p>
-    {!items.length&&<p className="empty-quote">Agrega tus diseños a la cotización para definir las planchas y distribuir las piezas.</p>}
+    {!items.length&&<p className="empty-quote">Puedes definir el formato de material ahora. Al agregar los diseños se actualizará la distribución.</p>}
     {[...groups].map(([key,models])=>{
       const options=settings[key];if(!options)return null;
       const charged=models[0].includeMaterial!==false,group=plan.groups.find(g=>g.key===key);
@@ -96,7 +97,7 @@ export default function MaterialPanel({items,settings,setSettings,plan,updateIte
         <button type="button" className="secondary" onClick={()=>editGroup(key,{stocks:[...options.stocks,defaultStock()]})}>＋ Agregar plancha o retazo</button>
         <p className="note">Para retazos existentes, indica cuántos tienes. Ingresa el precio del formato entero; se cobra proporcionalmente el bloque ocupado. Usa 0 si no deseas cobrar ese material. En retazos irregulares, introduce un rectángulo útil interior. El peso depende de una densidad nominal del material.</p>
         <h4>Reserva por fallas y orientación</h4>
-        {models.map(it=>{let production;try{production=productionQuantity(it)}catch{}
+        {models.filter(it=>!it.contextOnly).map(it=>{let production;try{production=productionQuantity(it)}catch{}
           return <div className="reserve-card" key={it.id}><div className="card-heading"><b>{it.name}</b><button type="button" className="remove-button" aria-label={'Quitar diseño '+it.name} title="Quitar este diseño de la cotización" onClick={()=>removeItem(it.id)}>×</button></div><div className="fields-grid stock-fields">
             <Field label="Unidades a entregar"><input type="number" min="1" max="5000" step="1" value={it.qty} onChange={e=>updateItem(it.id,{qty:e.target.value===''?'':Number(e.target.value)})}/></Field>
             <Field label="Tipo de reserva"><select value={it.reserveMode??'percent'} onChange={e=>updateItem(it.id,{reserveMode:e.target.value,reserve:0})}><option value="percent">Porcentaje adicional</option><option value="units">Unidades adicionales</option></select></Field>
@@ -118,5 +119,4 @@ export function MaterialPrintSummary({plan}) {
   if(!plan.valid||!plan.groups.length)return null;
   return <div className="print-material"><h2>Material utilizado y reserva considerados</h2>{plan.groups.map(g=><div key={g.key}><h3>{g.title}</h3><p>{g.sheets.length} formato(s) de referencia · {num(g.usedWeight)} kg de material utilizado · {g.options.gap} mm entre piezas · {g.options.margin} mm al borde.</p><ul>{g.options.stocks.map(s=>{const count=g.sheets.filter(sheet=>sheet.stock.id===s.id).length;return count>0&&<li key={s.id}>{count} × {s.name}: {s.width} × {s.height} mm</li>})}</ul><p>Bloques ocupados: {num(g.usedArea/1e6)} m². Se cobra solo esa proporción de los formatos.</p><p>{g.models.map(it=>{const p=plan.production[it.id];return it.name+': '+p.delivery+' a entregar + '+p.extra+' de reserva'}).join('; ')}.</p></div>)}</div>;
 }
-
 
